@@ -1,0 +1,25 @@
+# 克隆
+
+git clone https://github.com/nginx/nginx.git
+cd nginx
+git checkout release-1.28.0
+cd ..
+#克隆
+git clone https://github.com/nginx/nginx-acme.git
+
+当前项目构建
+
+docker build -t my-nginx-acme .
+运行容器：
+docker run -d -p 80:80 -p 443:443 --name nginx-acme my-nginx-acme
+
+
+# 检查模块
+
+docker run --rm my-nginx-acme:latest ls -l /usr/lib/nginx/modules/ngx_http_acme_module.so
+
+
+
+# 放入nginx 顶部
+
+load_module /usr/lib/nginx/modules/ngx_http_acme_module.so;
