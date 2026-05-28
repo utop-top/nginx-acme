@@ -5,6 +5,10 @@ on:
     branches:
       - main
   workflow_dispatch:
+  # 新增定时触发器
+  schedule:
+    # 每天北京时间凌晨 2:00 (UTC 时间 18:00) 自动执行
+    - cron: '0 18 * * *'
 
 permissions:
   packages: write
