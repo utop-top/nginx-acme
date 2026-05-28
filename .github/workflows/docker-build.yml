@@ -1,13 +1,9 @@
-name: Build and Push Tuwunel Image
+name: Auto Build Nginx with ACME
 
 on:
   push:
     branches:
       - main
-  workflow_run:
-    workflows: ["Sync Upstream"]
-    types:
-      - completed
   workflow_dispatch:
 
 permissions:
@@ -20,24 +16,29 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
-  build-tuwunel:
-    runs-on: self-hosted
-    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+  build-and-push:
+    runs-on: self-hosted 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # 使用 bash 强制执行，规避 Linux 执行权限丢失问题
+      - name: Run Pre-build Initialization Script
+        run: |
+          echo "Executing front_build.sh..."
+          bash front_build.sh
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # 1. 登录 Docker Hub (你的核心目标)
+      # 登录 Docker Hub
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # 2. 登录 GitHub 容器库 (作为双重备份容灾)
+      # 登录 GitHub Container Registry
       - name: Log in to the Container registry
         uses: docker/login-action@v3
         with:
@@ -45,34 +46,35 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # 3. 生成推送路径标签
+      # 生成双路推送标签
       - name: Extract Docker metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
-          # 在这里声明了两个目标仓库，构建完成后会自动推送到这两个地方
           images: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/tuwunel
+            ${{ secrets.DOCKERHUB_USERNAME }}/nginx-acme
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
+            type=raw,value=1.28.0
             type=raw,value=latest
             type=sha,format=short
 
-      # 4. 调用 Mac 原生算力进行构建与多路推送
+      # 执行物理编译
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: ./my-custom.Dockerfile
+          file: ./Dockerfile
           push: true
           platforms: linux/amd64,linux/arm64
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=local,src=/tmp/.buildx-cache
-          cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
+          # 启用 Mac 本地 SSD 高速缓存，路径与 tuwunel 隔离
+          cache-from: type=local,src=/tmp/.nginx-buildx-cache
+          cache-to: type=local,dest=/tmp/.nginx-buildx-cache-new,mode=max
 
-      # 5. 滚动替换 Mac 硬盘缓存，防止磁盘塞满
+      # 滚动清理本地缓存
       - name: Move cache
         run: |
-          rm -rf /tmp/.buildx-cache
-          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
+          rm -rf /tmp/.nginx-buildx-cache
+          mv /tmp/.nginx-buildx-cache-new /tmp/.nginx-buildx-cache
