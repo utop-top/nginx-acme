@@ -26,7 +26,7 @@ jobs:
       - name: Run Pre-build Initialization Script
         run: |
           echo "Executing front_build.sh..."
-          ./front_build.sh
+          bash front_build.sh
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
