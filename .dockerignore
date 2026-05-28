@@ -1,0 +1,7 @@
+# 忽略掉拉取下来的 Git 历史记录
+nginx/.git
+nginx-acme/.git
+
+# 忽略构建脚本自身
+front_build.sh
+.github
